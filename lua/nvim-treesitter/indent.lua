@@ -176,12 +176,19 @@ function M.get_indent(lnum)
 
   -- tracks to ensure multiple indent levels are not applied for same line
   local is_processed_by_row = {} --- @type table<integer,boolean>
+  -- tracks the first processed node per row (for dedup bypass checks)
+  local first_processed_node_by_row = {} --- @type table<integer,TSNode>
+
+  -- tracks nodes visited during the bottom-up walk (for post-walk branch scan)
+  local visited_nodes = {} --- @type table<integer,TSNode>
+  local has_dedup_bypass = false
 
   if node and q['indent.zero'][node:id()] then
     return 0
   end
 
   while node do
+    visited_nodes[node:id()] = node
     -- do 'autoindent' if not marked as @indent
     if
       not q['indent.begin'][node:id()]
@@ -222,21 +229,40 @@ function M.get_indent(lnum)
 
     -- do not indent for nodes that starts-and-ends on same line and starts on target line (lnum)
     local should_process = not is_processed_by_row[srow]
+    local indent_begin_meta = q['indent.begin'][node:id()]
+    local can_bypass_dedup = false
+    if not should_process and indent_begin_meta and indent_begin_meta['indent.no_deduplicate'] then
+      -- Only bypass dedup when the blocking node is the first named child of
+      -- the current node. This ensures `fn({` (adjacent delimiters) gets both
+      -- indent levels, while `fn(a, {` (object is not first arg) does not.
+      local blocking_node = first_processed_node_by_row[srow]
+      if blocking_node then
+        for child in node:iter_children() do
+          if child:named() then
+            can_bypass_dedup = child:id() == blocking_node:id()
+            break
+          end
+        end
+      end
+    end
     local is_in_err = false
-    if should_process then
+    if should_process or can_bypass_dedup then
       local parent = node:parent()
       is_in_err = parent and parent:has_error() or false
     end
     if
-      should_process
+      (should_process or can_bypass_dedup)
       and (
-        q['indent.begin'][node:id()]
-        and (srow ~= erow or is_in_err or q['indent.begin'][node:id()]['indent.immediate'])
-        and (srow ~= lnum - 1 or q['indent.begin'][node:id()]['indent.start_at_same_line'])
+        indent_begin_meta
+        and (srow ~= erow or is_in_err or indent_begin_meta['indent.immediate'])
+        and (srow ~= lnum - 1 or indent_begin_meta['indent.start_at_same_line'])
       )
     then
       indent = indent + indent_size
       is_processed = true
+      if can_bypass_dedup and not should_process then
+        has_dedup_bypass = true
+      end
     end
 
     if is_in_err and not q['indent.align'][node:id()] then
@@ -335,9 +361,35 @@ function M.get_indent(lnum)
       end
     end
 
+    if is_processed and not first_processed_node_by_row[srow] then
+      first_processed_node_by_row[srow] = node
+    end
     is_processed_by_row[srow] = is_processed_by_row[srow] or is_processed
 
     node = node:parent()
+  end
+
+  -- When stacked delimiters were processed (e.g., `({`), check for additional
+  -- @indent.branch nodes on the target line that weren't in the ancestor walk.
+  -- This handles closing lines like `})` where `}` is visited but `)` is a
+  -- sibling node and not in the ancestor chain.
+  if has_dedup_bypass then
+    local extra_branch_seen = {} --- @type table<integer,boolean>
+    for _, v_node in pairs(visited_nodes) do
+      for child in v_node:iter_children() do
+        if
+          not visited_nodes[child:id()]
+          and not extra_branch_seen[child:id()]
+          and q['indent.branch'][child:id()]
+        then
+          local child_srow = child:start()
+          if child_srow == lnum - 1 then
+            indent = indent - indent_size
+            extra_branch_seen[child:id()] = true
+          end
+        end
+      end
+    end
   end
 
   return indent

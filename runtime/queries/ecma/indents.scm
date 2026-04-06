@@ -39,6 +39,12 @@
   value: (_) @_value
   (#not-kind-eq? @_value "arrow_function" "call_expression")) @indent.begin
 
+; When arguments contains an object literal on the same line (e.g., `fn({`),
+; allow both to contribute indent levels despite starting on the same row.
+((arguments
+  (object)) @indent.begin
+  (#set! indent.no_deduplicate))
+
 (arguments
   ")" @indent.end)
 

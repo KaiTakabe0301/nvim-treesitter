@@ -168,5 +168,22 @@ describe('indent JavaScript:', function()
         { on_line = info.line, text = 'foo();', indent = info.indent }
       )
     end
+
+    -- object as first argument: fn({ gets both arguments and object indent
+    for _, info in ipairs({
+      { 1, 4 },
+      { 3, 0 },
+      { 6, 6 },
+      { 8, 2 },
+      { 11, 2 },
+      { 13, 0 },
+    }) do
+      run:new_line(
+        'ecma/object_in_args.js',
+        { on_line = info[1], text = '//', indent = info[2] },
+        info[3],
+        info[4]
+      )
+    end
   end)
 end)
