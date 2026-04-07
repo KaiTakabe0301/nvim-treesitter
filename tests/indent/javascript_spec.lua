@@ -149,6 +149,11 @@ describe('indent JavaScript:', function()
     for _, info in ipairs({
       { 1, 2 },
       { 2, 0 },
+      { 8, 2 },
+      { 9, 0 },
+      { 11, 2 },
+      { 12, 0 },
+      { 14, 0 },
     }) do
       run:new_line(
         'ecma/variable.js',

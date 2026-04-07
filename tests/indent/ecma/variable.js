@@ -4,3 +4,11 @@ let a =
 a = func_call()
   .map()
   .filter()
+
+const { visibleItemFieldNames, loading } =
+  useVisibleQuotationItemFieldNames()
+
+const result =
+  someFunction(arg1, arg2)
+
+const x = simpleCall()
