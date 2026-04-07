@@ -12,3 +12,13 @@ const result =
   someFunction(arg1, arg2)
 
 const x = simpleCall()
+
+function test() {
+  const { data, loading } =
+    useSomeQuery({
+      skip: !id,
+      variables: {
+        id: id,
+      },
+    })
+}

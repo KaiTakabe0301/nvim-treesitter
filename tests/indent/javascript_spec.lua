@@ -154,6 +154,13 @@ describe('indent JavaScript:', function()
       { 11, 2 },
       { 12, 0 },
       { 14, 0 },
+      { 16, 2 },
+      { 17, 4 },
+      { 18, 6 },
+      { 19, 6 },
+      { 20, 8 },
+      { 23, 2 },
+      { 24, 0 },
     }) do
       run:new_line(
         'ecma/variable.js',

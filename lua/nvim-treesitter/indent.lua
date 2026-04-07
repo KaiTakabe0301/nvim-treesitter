@@ -182,6 +182,7 @@ function M.get_indent(lnum)
   -- tracks nodes visited during the bottom-up walk (for post-walk branch scan)
   local visited_nodes = {} --- @type table<integer,TSNode>
   local has_dedup_bypass = false
+  local has_cancel_on_stacked = false
 
   if node and q['indent.zero'][node:id()] then
     return 0
@@ -262,6 +263,9 @@ function M.get_indent(lnum)
       is_processed = true
       if can_bypass_dedup and not should_process then
         has_dedup_bypass = true
+      end
+      if indent_begin_meta['indent.cancel_on_stacked'] then
+        has_cancel_on_stacked = true
       end
     end
 
@@ -373,6 +377,7 @@ function M.get_indent(lnum)
   -- @indent.branch nodes on the target line that weren't in the ancestor walk.
   -- This handles closing lines like `})` where `}` is visited but `)` is a
   -- sibling node and not in the ancestor chain.
+  local post_walk_subtracted = false
   if has_dedup_bypass then
     local extra_branch_seen = {} --- @type table<integer,boolean>
     for _, v_node in pairs(visited_nodes) do
@@ -386,10 +391,20 @@ function M.get_indent(lnum)
           if child_srow == lnum - 1 then
             indent = indent - indent_size
             extra_branch_seen[child:id()] = true
+            post_walk_subtracted = true
           end
         end
       end
     end
+  end
+
+  -- When a cancel_on_stacked node (e.g., variable_declarator) fired alongside
+  -- stacked delimiters (e.g., `fn({`), cancel the extra indent level — but only
+  -- on content lines. On closing lines like `})`, the post-walk branch scan
+  -- already subtracts for `)`, so the cancel_on_stacked indent is needed to
+  -- keep the balance.
+  if has_dedup_bypass and has_cancel_on_stacked and not post_walk_subtracted then
+    indent = indent - indent_size
   end
 
   return indent

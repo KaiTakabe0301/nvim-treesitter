@@ -35,9 +35,10 @@
   right: (_) @_right
   (#not-kind-eq? @_right "arrow_function")) @indent.begin
 
-(variable_declarator
+((variable_declarator
   value: (_) @_value
   (#not-kind-eq? @_value "arrow_function")) @indent.begin
+  (#set! indent.cancel_on_stacked))
 
 ; When arguments contains an object literal on the same line (e.g., `fn({`),
 ; allow both to contribute indent levels despite starting on the same row.
